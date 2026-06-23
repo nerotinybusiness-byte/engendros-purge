@@ -464,6 +464,44 @@ export function splitGeomAtY(pos, col, nor, uv, comp, cut) {
   return { lo, hi };
 }
 
+// makeSplinters — a jagged "torn wood" crown for a break face. PURE & THREE-free (node-testable),
+// returns a non-indexed triangle-soup bag {positions,colors,normals,uvs} in the LOCAL space of the
+// piece it is parented to. The break is a circle of `radius` centred at (cx,cy,cz); `count` teeth ring
+// it; each tooth's tip is pushed along ±Y (trunks build along +Y) by a SEEDED length in [lenMin,lenMax]
+// (varying heights = torn look). `up` picks the direction: a stump points teeth up out of the cut; a
+// broken/falling top points them the other way. Both triangle windings are emitted so a single-sided
+// wood material shows the teeth from both faces. Deterministic: same seed → same crown.
+export function makeSplinters(cx, cy, cz, radius, seed, count = 8, lenMin = 0.15, lenMax = 0.6, up = true, color = [0.74, 0.60, 0.42]) {
+  const positions = [], colors = [], normals = [], uvs = [];
+  let s = (seed >>> 0) || 1;
+  const rng = () => { s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const dir = up ? 1 : -1, cr = color[0], cg = color[1], cb = color[2];
+  const tooth = (ax, ay, az, bx, by, bz, tx, ty, tz) => {
+    const ux = bx - ax, uy = by - ay, uz = bz - az, vx = tx - ax, vy = ty - ay, vz = tz - az;
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+    // winding A (n) then winding B (−n): two-sided
+    const tri = (p, q, w, sgn) => {
+      positions.push(p[0], p[1], p[2], q[0], q[1], q[2], w[0], w[1], w[2]);
+      for (let k = 0; k < 3; k++) { normals.push(nx * sgn, ny * sgn, nz * sgn); colors.push(cr, cg, cb); uvs.push(0, 0); }
+    };
+    const A = [ax, ay, az], B = [bx, by, bz], T = [tx, ty, tz];
+    tri(A, B, T, 1); tri(B, A, T, -1);
+  };
+  for (let i = 0; i < count; i++) {
+    const a0 = (i / count) * Math.PI * 2, a1 = ((i + 1) / count) * Math.PI * 2;
+    const r0 = radius * (0.8 + rng() * 0.2), r1 = radius * (0.8 + rng() * 0.2);   // rim base, within radius
+    const am = (a0 + a1) / 2, rm = radius * (0.15 + rng() * 0.45);                // tip pulled inward
+    const len = lenMin + rng() * (lenMax - lenMin);
+    tooth(
+      cx + Math.cos(a0) * r0, cy, cz + Math.sin(a0) * r0,
+      cx + Math.cos(a1) * r1, cy, cz + Math.sin(a1) * r1,
+      cx + Math.cos(am) * rm, cy + dir * len, cz + Math.sin(am) * rm,
+    );
+  }
+  return { positions, colors, normals, uvs };
+}
+
 // Where a STANDING tree snaps when shot: the break fraction = the hit height up the trunk, clamped so
 // a snap never sits at the very base (a tiny stub) or up in the crown (a half-canopy stub). remainFrac
 // (= breakAt) scales the surviving stump's HP so a tall stump still resists, a short stub dies easily.
