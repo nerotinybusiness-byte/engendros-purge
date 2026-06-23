@@ -232,8 +232,20 @@ export class ForestDemo {
       breakY = split.breakY;
       topWoodMesh = new THREE.Mesh(split.topWoodGeometry, split.material); topWoodMesh.castShadow = true;
       if (split.topLeafGeometry) { topLeafMesh = new THREE.Mesh(split.topLeafGeometry, FOLIAGE_OPAQUE); topLeafMesh.castShadow = true; }
-      liveStump = !rec.charred && breakY >= STUB_FLOOR;
+      liveStump = breakY >= STUB_FLOOR;   // FIX 1: charred trees always take the live-stump path (shootable stump)
       stumpMesh = new THREE.Mesh(split.stumpWoodGeometry, split.material);
+      if (!liveStump) {
+        // FIX 2: stump too short to be re-snappable (e.g. birch sapling breakAt=0.1 → breakY<STUB_FLOOR)
+        // → topple the WHOLE tree from the base, no immortal non-shootable stub. Mirror the uproot branch.
+        if (topWoodMesh) topWoodMesh.geometry.dispose();
+        if (topLeafMesh) topLeafMesh.geometry.dispose();
+        stumpMesh = null; breakY = 0;
+        const wm = rec._woodMesh || (rec.mesh && (rec.mesh.isMesh ? rec.mesh : rec.mesh.children.find((c) => c.isMesh && c !== rec.leafMesh)));
+        topWoodMesh = wm && wm.geometry ? new THREE.Mesh(wm.geometry.clone(), wm.material) : null;
+        if (topWoodMesh) topWoodMesh.castShadow = true;
+        topLeafMesh = rec.leafMesh && rec.leafMesh.geometry ? new THREE.Mesh(rec.leafMesh.geometry.clone(), FOLIAGE_OPAQUE) : null;
+        if (topLeafMesh) topLeafMesh.castShadow = true;
+      }
     } else {
       // RE-snap — geometry-split the bare stump wood at the cut (no crown left to preserve).
       const wm = rec._woodMesh || (rec.mesh && rec.mesh.isMesh ? rec.mesh : null);
@@ -262,7 +274,7 @@ export class ForestDemo {
       const e = sp[sp.length - 1]; return [e[0], e[2]];
     };
     const _spl = _cl(breakY);
-    const _splR = (rec.trunkR || 0.3) * (1 - 0.6 * (breakY / _fullH)) + 0.1;
+    const _splR = (rec.trunkR || 0.3) * (1 - 0.6 * (breakY / _fullH));   // FIX 4a: removed +0.1 collision-pad leak
     const _splMat = (stumpMesh && stumpMesh.material) || (topWoodMesh && topWoodMesh.material) || SPLINTER_MAT;
 
     // remove the OLD standing mesh + its wind entry
@@ -361,7 +373,7 @@ export class ForestDemo {
     const minA = [Math.min(ax, bx) - r, Math.min(ay, by, gy), Math.min(az, bz) - r];
     const maxA = [Math.max(ax, bx) + r, Math.max(ay, by, gy) + 2 * r, Math.max(az, bz) + r];
     const part = makePart(id, matName, minA, maxA, (TREE_HP[(rec && rec.cls) || 2] / MATERIALS[matName].hp) * LOG_HP_MUL); // a downed log is sturdy scenery — takes a BURST to shoot apart, not one stray bullet
-    const log = { fallen: true, prop: true, id, part, mesh: f.pivot, leafMesh: f.topLeafMesh || null, trunkR: r, cls: (rec && rec.cls) || 2,
+    const log = { fallen: true, prop: true, id, part, mesh: f.pivot, leafMesh: f.topLeafMesh || null, trunkR: r, boleR: (rec && rec.trunkR) || 0.25, cls: (rec && rec.cls) || 2,   // boleR = unpadded visual radius (trunkR adds +0.12 collision pad)
                   height: maxA[1] - minA[1],   // fire reads owner.height → keeps a downed log's flame low (not a 12 m tree column)
                   _axis3: [s * b.dirXZ[0], c, s * b.dirXZ[1]],   // world unit-vector along the log from pivot (butt) to tip; used by breakLogSeg for splinter orientation
                   fallingRef: f, burntOut: !!f.charred, consumed: false, boxes: [] };  // charred logs already burnt → not flammable
@@ -587,7 +599,9 @@ export class ForestDemo {
     const c = seg.part ? [(seg.part.min[0] + seg.part.max[0]) / 2, (seg.part.min[1] + seg.part.max[1]) / 2, (seg.part.min[2] + seg.part.max[2]) / 2] : [0, 0, 0];
     if (this.debris) this.debris.burst('splints', c, (seed >>> 0) || 1, undefined, [0, 0.5, 0]);
     if (seg.mesh && seg.mesh.parent) { this.scene.attach(seg.mesh);   // keep world pose, reparent to scene so a world-down sink reads right
-      this._sinking.push({ mesh: seg.mesh, t: 0, dur: 0.9, y0: seg.mesh.position.y, drop: Math.max(1.5, 2 * (log.trunkR || 0.4)) }); }
+      // FIX 6: drop by the seg's world AABB height so angled middle chunks sink fully (not just 1.5 m)
+      const _sh = seg.part ? (seg.part.max[1] - seg.part.min[1]) : (2 * (log.trunkR || 0.4));
+      this._sinking.push({ mesh: seg.mesh, t: 0, dur: 0.9, y0: seg.mesh.position.y, drop: Math.max(1.5, _sh + 1.4) }); }
   }
   breakLogSegById(id, sids) {                                   // co-op client mirror (host already ran the cascade)
     const log = this.logs.find((l) => l.id === id); if (!log || !log.segs) return;
@@ -618,7 +632,7 @@ export class ForestDemo {
     try {
       log.mesh.updateWorldMatrix(true, false);
       const _ax = log._axis3 || [0, 1, 0];
-      const _r   = Math.max(0.12, log.trunkR || 0.25);
+      const _r   = Math.max(0.08, log.boleR || 0.13);   // FIX 4b: use unpadded bole radius (log.trunkR has +0.12 collision pad → splinters too wide)
       const _cx  = (pMin[0] + pMax[0]) / 2;
       const _cy  = (pMin[1] + pMax[1]) / 2;
       const _cz  = (pMin[2] + pMax[2]) / 2;
@@ -865,6 +879,7 @@ export class ForestDemo {
     if (log.mesh) log.mesh.traverse((o) => {
       if (!o.isMesh || !o.material || !o.material.color) return;
       if (o === log.leafMesh) o.material = o.material.clone();   // shared foliage mat → clone before tinting
+      if (o.material === SPLINTER_MAT) o.material = o.material.clone();   // FIX 3: don't mutate the shared splinter material
       o.material.color.setHex(0x161310);
     });
     this._emitForest('charlog', log.id);   // host-auth: mirror the blackened log on every peer
