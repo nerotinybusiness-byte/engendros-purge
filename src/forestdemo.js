@@ -362,6 +362,7 @@ export class ForestDemo {
     const part = makePart(id, matName, minA, maxA, (TREE_HP[(rec && rec.cls) || 2] / MATERIALS[matName].hp) * LOG_HP_MUL); // a downed log is sturdy scenery — takes a BURST to shoot apart, not one stray bullet
     const log = { fallen: true, prop: true, id, part, mesh: f.pivot, leafMesh: f.topLeafMesh || null, trunkR: r, cls: (rec && rec.cls) || 2,
                   height: maxA[1] - minA[1],   // fire reads owner.height → keeps a downed log's flame low (not a 12 m tree column)
+                  _axis3: [s * b.dirXZ[0], c, s * b.dirXZ[1]],   // world unit-vector along the log from pivot (butt) to tip; used by breakLogSeg for splinter orientation
                   fallingRef: f, burntOut: !!f.charred, consumed: false, boxes: [] };  // charred logs already burnt → not flammable
     part.downer = log;
     // ── 1:1 COLLISION HULL ───────────────────────────────────────────────────────────────────────
@@ -559,12 +560,49 @@ export class ForestDemo {
   breakLogSeg(log, seg, seed) {
     if (!log || !seg || seg.dead || log.consumed) return;
     const sd = (seed >>> 0) || 1;
+    // capture the removed seg's world AABB BEFORE _killSeg so we can compute the exposed-face positions
+    const _segPartMin = seg.part ? [seg.part.min[0], seg.part.min[1], seg.part.min[2]] : null;
+    const _segPartMax = seg.part ? [seg.part.max[0], seg.part.max[1], seg.part.max[2]] : null;
+    const _segIdx = log.segs.indexOf(seg);
     this._killSeg(log, seg, sd);
     const extra = [];
     try {                                                       // orphan cascade (no-op for an all-grounded log)
       const orphans = orphanedCells(log.segs.map((s) => ({ dpart: s.sid, dead: s.dead, grounded: s.grounded, adj: s.adj })));
       for (const o of orphans) { const os = log.segs.find((s) => s.sid === o.dpart && !s.dead); if (os) { this._killSeg(log, os, (sd ^ os.sid) >>> 0); extra.push(os.sid); } }
     } catch (e) { console.warn('[forest] seg orphan cascade failed', e); }
+    // ── GAP SPLINTERS ── torn-wood crowns at the two newly-exposed chunk faces (cosmetic, no collision)
+    if (log.mesh && !log.consumed && _segPartMin && _segPartMax) {
+      try {
+        log.mesh.updateWorldMatrix(true, false);
+        const _ax = log._axis3 || [0, 1, 0];
+        const _r   = Math.max(0.12, log.trunkR || 0.25);
+        const _cx  = (_segPartMin[0] + _segPartMax[0]) / 2;
+        const _cy  = (_segPartMin[1] + _segPartMax[1]) / 2;
+        const _cz  = (_segPartMin[2] + _segPartMax[2]) / 2;
+        const _hx  = (_segPartMax[0] - _segPartMin[0]) / 2;
+        const _hy  = (_segPartMax[1] - _segPartMin[1]) / 2;
+        const _hz  = (_segPartMax[2] - _segPartMin[2]) / 2;
+        // support-function extent of the AABB along the log axis (how far the seg extends in each direction)
+        const _hlen = Math.abs(_ax[0]) * _hx + Math.abs(_ax[1]) * _hy + Math.abs(_ax[2]) * _hz;
+        // find surviving neighbours by index (index-based is unambiguous; adj[0]/[1] ordering is position-dependent)
+        const _prevSeg = _segIdx > 0 ? log.segs[_segIdx - 1] : null;
+        const _nextSeg = _segIdx < log.segs.length - 1 ? log.segs[_segIdx + 1] : null;
+        const _splMat = voxelMaterial();
+        // lower face = center − halfLen * axis3 = the stump-facing end of the removed seg
+        // (butt→tip = +Y in log.mesh local space; lower face = toward stump = lower local-Y → up=true = teeth +Y into gap)
+        if (_prevSeg && !_prevSeg.dead) {
+          const _lp = new THREE.Vector3(_cx - _ax[0] * _hlen, _cy - _ax[1] * _hlen, _cz - _ax[2] * _hlen);
+          log.mesh.worldToLocal(_lp);
+          log.mesh.add(this._splinterMesh(_lp.x, _lp.y, _lp.z, _r, ((seg.sid * 2654435761) >>> 0) || 1, true, _splMat));
+        }
+        // upper face = center + halfLen * axis3 = the tip-facing end of the removed seg → up=false = teeth −Y into gap
+        if (_nextSeg && !_nextSeg.dead) {
+          const _lp = new THREE.Vector3(_cx + _ax[0] * _hlen, _cy + _ax[1] * _hlen, _cz + _ax[2] * _hlen);
+          log.mesh.worldToLocal(_lp);
+          log.mesh.add(this._splinterMesh(_lp.x, _lp.y, _lp.z, _r, (((seg.sid + 1) * 2654435761) >>> 0) ^ 0xa5, false, _splMat));
+        }
+      } catch (e) { console.warn('[forest] gap splinters failed', e); }
+    }
     this._emitForest('segdie', log.id, { sids: [seg.sid, ...extra] });   // host-auth: clients mirror the same chunks
     if (log.segs.every((s) => s.dead)) this._consumeLog(log, sd, true);  // last chunk gone → tidy the empty log
   }
