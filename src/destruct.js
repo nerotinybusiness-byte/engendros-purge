@@ -488,10 +488,13 @@ export function makeSplinters(cx, cy, cz, radius, seed, count = 8, lenMin = 0.15
     const A = [ax, ay, az], B = [bx, by, bz], T = [tx, ty, tz];
     tri(A, B, T, 1); tri(B, A, T, -1);
   };
+  const slotW = (Math.PI * 2) / count;
   for (let i = 0; i < count; i++) {
-    const a0 = (i / count) * Math.PI * 2, a1 = ((i + 1) / count) * Math.PI * 2;
+    // FIX 5: jitter each tooth's angular position within its slot (±0.35 slot width) → torn/irregular look
+    const ja = (rng() - 0.5) * 0.7 * slotW, jb = (rng() - 0.5) * 0.7 * slotW;
+    const a0 = (i / count) * Math.PI * 2 + ja, a1 = ((i + 1) / count) * Math.PI * 2 + jb;
     const r0 = radius * (0.8 + rng() * 0.2), r1 = radius * (0.8 + rng() * 0.2);   // rim base, within radius
-    const am = (a0 + a1) / 2, rm = radius * (0.15 + rng() * 0.45);                // tip pulled inward
+    const am = (a0 + a1) / 2, rm = radius * (0.08 + rng() * 0.57);                 // wider inward-pull variance [0.08,0.65]×radius
     const len = lenMin + rng() * (lenMax - lenMin);
     tooth(
       cx + Math.cos(a0) * r0, cy, cz + Math.sin(a0) * r0,
