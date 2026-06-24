@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { makeSplinters } from '../../src/destruct.js';
+import { makeSplinters, mergeBags } from '../../src/destruct.js';
 
 test('makeSplinters: count teeth → 2 triangles each (two-sided) → 18 floats/tooth', () => {
   const b = makeSplinters(0, 5, 0, 0.5, 123, 8);
@@ -50,4 +50,30 @@ test('makeSplinters: colour = the raw-wood tone on every vertex', () => {
   for (let i = 0; i < b.colors.length; i += 3) {
     assert.equal(b.colors[i], col[0]); assert.equal(b.colors[i + 1], col[1]); assert.equal(b.colors[i + 2], col[2]);
   }
+});
+
+test('mergeBags: concatenates both bags attribute-by-attribute', () => {
+  const a = { positions: [0,0,0, 1,0,0, 0,1,0], colors: [1,1,1, 1,1,1, 1,1,1], normals: [0,0,1, 0,0,1, 0,0,1], uvs: [0,0, 1,0, 0,1] };
+  const b = { positions: [9,9,9], colors: [2,2,2], normals: [1,0,0], uvs: [5,5] };
+  const m = mergeBags(a, b);
+  assert.deepEqual(m.positions, [0,0,0, 1,0,0, 0,1,0, 9,9,9]);
+  assert.deepEqual(m.colors,    [1,1,1, 1,1,1, 1,1,1, 2,2,2]);
+  assert.deepEqual(m.normals,   [0,0,1, 0,0,1, 0,0,1, 1,0,0]);
+  assert.deepEqual(m.uvs,       [0,0, 1,0, 0,1, 5,5]);
+});
+
+test('mergeBags: does not mutate the inputs', () => {
+  const a = { positions: [1,2,3], colors: [0,0,0], normals: [0,1,0], uvs: [0,0] };
+  const b = { positions: [4,5,6], colors: [1,1,1], normals: [1,0,0], uvs: [1,1] };
+  const aPos = a.positions.slice();
+  mergeBags(a, b);
+  assert.deepEqual(a.positions, aPos);
+});
+
+test('mergeBags: real makeSplinters crown appends onto a wood bag', () => {
+  const wood = { positions: [0,0,0, 1,0,0, 0,1,0], colors: [0.4,0.3,0.2, 0.4,0.3,0.2, 0.4,0.3,0.2], normals: [0,0,1,0,0,1,0,0,1], uvs: [0,0,0,0,0,0] };
+  const crown = makeSplinters(0, 0, 0, 0.3, 7, 8);
+  const m = mergeBags(wood, crown);
+  assert.equal(m.positions.length, wood.positions.length + crown.positions.length);
+  assert.equal(m.colors.length, wood.colors.length + crown.colors.length);
 });

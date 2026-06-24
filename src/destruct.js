@@ -505,6 +505,25 @@ export function makeSplinters(cx, cy, cz, radius, seed, count = 8, lenMin = 0.15
   return { positions, colors, normals, uvs };
 }
 
+// mergeBags — concatenate two triangle-soup bags {positions,colors,normals,uvs} into a NEW bag (inputs
+// untouched). Both bags must carry the same attributes (the wood bags and makeSplinters both produce all
+// four). Used to bake a splinter crown INTO a wood piece's geometry so the teeth become triangles of that
+// piece and inherit its whole lifecycle. PURE & THREE-free (node-testable).
+export function mergeBags(base, add) {
+  const cat = (a, b) => {
+    if (a == null && b == null) return null;
+    const out = a ? a.slice() : [];
+    if (b) for (let i = 0; i < b.length; i++) out.push(b[i]);
+    return out;
+  };
+  return {
+    positions: cat(base.positions, add.positions),
+    colors:    cat(base.colors,    add.colors),
+    normals:   cat(base.normals,   add.normals),
+    uvs:       cat(base.uvs,       add.uvs),
+  };
+}
+
 // Where a STANDING tree snaps when shot: the break fraction = the hit height up the trunk, clamped so
 // a snap never sits at the very base (a tiny stub) or up in the crown (a half-canopy stub). remainFrac
 // (= breakAt) scales the surviving stump's HP so a tall stump still resists, a short stub dies easily.
