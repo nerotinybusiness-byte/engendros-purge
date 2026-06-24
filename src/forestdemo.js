@@ -423,14 +423,17 @@ export class ForestDemo {
       const segHpScale = (TREE_HP[(rec && rec.cls) || 2] / MATERIALS[matName].hp) * LOG_HP_MUL / nSeg;
       if (top) top.remove(wood); wood.geometry.dispose();       // replace the single falling-top mesh with the chunks
       segGeos.forEach((sg, idx) => {
-        const g = new THREE.BufferGeometry();
-        g.setAttribute('position', new THREE.Float32BufferAttribute(sg.positions, 3));
-        if (sg.normals) g.setAttribute('normal', new THREE.Float32BufferAttribute(sg.normals, 3));
-        if (sg.uvs) g.setAttribute('uv', new THREE.Float32BufferAttribute(sg.uvs, 2));
-        if (sg.colors) g.setAttribute('color', new THREE.Float32BufferAttribute(sg.colors, 3));
-        g.computeBoundingSphere();
+        // C4: bake splinter crowns at BOTH cut faces INTO the chunk geometry — teeth become triangles of this
+        // chunk's mesh, so when the chunk is shot out and sinks, its torn-wood crowns sink with it (no separate mesh).
+        // Lower-Y face = butt-facing gap (teeth +Y into gap); upper-Y face = tip-facing gap (teeth −Y into gap).
+        const _r = log.boleR;
+        const _sid = id * 100 + idx;
+        const _cx = (sg.min[0] + sg.max[0]) / 2, _cz = (sg.min[2] + sg.max[2]) / 2;
+        const crownLo = makeSplinters(_cx, sg.min[1], _cz, _r, (_sid * 2654435761) >>> 0, 9, _r * 0.4, Math.min(_r * 1.3, 0.85), true, WOOD_RAW);
+        const crownHi = makeSplinters(_cx, sg.max[1], _cz, _r, ((_sid + 1) * 2654435761) >>> 0, 9, _r * 0.4, Math.min(_r * 1.3, 0.85), false, WOOD_RAW);
+        const g = this._geomFrom(mergeBags(mergeBags(sg, crownLo), crownHi));
         const m = new THREE.Mesh(g, wood.material); m.castShadow = true; if (top) top.add(m);
-        const sid = id * 100 + idx, part = makePart(sid, matName, [0, 0, 0], [0, 0, 0], segHpScale);
+        const sid = _sid, part = makePart(sid, matName, [0, 0, 0], [0, 0, 0], segHpScale);
         part.downer = log;
         log.segs.push({ sid, mesh: m, part, dead: false, grounded: true, adj: [], boxes: [] });
       });
@@ -581,18 +584,12 @@ export class ForestDemo {
   breakLogSeg(log, seg, seed) {
     if (!log || !seg || seg.dead || log.consumed) return;
     const sd = (seed >>> 0) || 1;
-    // capture the removed seg's world AABB BEFORE _killSeg so we can compute the exposed-face positions
-    const _segPartMin = seg.part ? [seg.part.min[0], seg.part.min[1], seg.part.min[2]] : null;
-    const _segPartMax = seg.part ? [seg.part.max[0], seg.part.max[1], seg.part.max[2]] : null;
-    const _segIdx = log.segs.indexOf(seg);
     this._killSeg(log, seg, sd);
     const extra = [];
     try {                                                       // orphan cascade (no-op for an all-grounded log)
       const orphans = orphanedCells(log.segs.map((s) => ({ dpart: s.sid, dead: s.dead, grounded: s.grounded, adj: s.adj })));
       for (const o of orphans) { const os = log.segs.find((s) => s.sid === o.dpart && !s.dead); if (os) { this._killSeg(log, os, (sd ^ os.sid) >>> 0); extra.push(os.sid); } }
     } catch (e) { console.warn('[forest] seg orphan cascade failed', e); }
-    // ── GAP SPLINTERS ── torn-wood crowns at the two newly-exposed chunk faces (cosmetic, no collision)
-    this._addGapSplinters(log, _segIdx, _segPartMin, _segPartMax, seg.sid);
     this._emitForest('segdie', log.id, { sids: [seg.sid, ...extra] });   // host-auth: clients mirror the same chunks
     if (log.segs.every((s) => s.dead)) this._consumeLog(log, sd, true);  // last chunk gone → tidy the empty log
   }
@@ -613,59 +610,9 @@ export class ForestDemo {
   }
   breakLogSegById(id, sids) {                                   // co-op client mirror (host already ran the cascade)
     const log = this.logs.find((l) => l.id === id); if (!log || !log.segs) return;
-    // snapshot the first (directly-shot) seg's AABB + index BEFORE _killSeg for gap-splinter parity
-    const _firstSid = sids && sids.length ? sids[0] : null;
-    let _gapSegIdx = -1, _gapPMin = null, _gapPMax = null, _gapSid = 0;
-    if (_firstSid != null) {
-      const _fs = log.segs.find((s) => s.sid === _firstSid && !s.dead);
-      if (_fs && _fs.part) {
-        _gapSegIdx = log.segs.indexOf(_fs);
-        _gapPMin = [_fs.part.min[0], _fs.part.min[1], _fs.part.min[2]];
-        _gapPMax = [_fs.part.max[0], _fs.part.max[1], _fs.part.max[2]];
-        _gapSid = _firstSid;
-      }
-    }
+    // C4: gap-splinter crowns are now baked into chunk geometry at register time — no per-kill splinter call needed
     for (const sid of (sids || [])) { const seg = log.segs.find((s) => s.sid === sid && !s.dead); if (seg) this._killSeg(log, seg, (sid >>> 0) || 1); }
-    // gap-splinter crowns: identical seeds to host so geometry matches deterministically
-    if (_gapSegIdx >= 0) this._addGapSplinters(log, _gapSegIdx, _gapPMin, _gapPMax, _gapSid);
     if (log.segs.length && log.segs.every((s) => s.dead) && !log.consumed) { log.consumed = true; this._fading.delete(log); if (log.part) log.part.dead = true; if (this.game.fire) this.game.fire.retire(log.part); }
-  }
-
-  // Torn-wood crowns at the two newly-exposed faces of a shot-out log chunk (cosmetic, no collision).
-  // Called by BOTH the host path (breakLogSeg) and the co-op client mirror (breakLogSegById) so both
-  // peers show the gap. Seeds are deterministic on seg.sid → identical geometry on all clients.
-  // segIdx = index of the removed seg in log.segs (already dead); pMin/pMax = its pre-kill world AABB.
-  _addGapSplinters(log, segIdx, pMin, pMax, sid) {
-    if (!log.mesh || log.consumed || !pMin || !pMax) return;
-    try {
-      log.mesh.updateWorldMatrix(true, false);
-      const _ax = log._axis3 || [0, 1, 0];
-      const _r   = Math.max(0.08, log.boleR || 0.13);   // FIX 4b: use unpadded bole radius (log.trunkR has +0.12 collision pad → splinters too wide)
-      const _cx  = (pMin[0] + pMax[0]) / 2;
-      const _cy  = (pMin[1] + pMax[1]) / 2;
-      const _cz  = (pMin[2] + pMax[2]) / 2;
-      const _hx  = (pMax[0] - pMin[0]) / 2;
-      const _hy  = (pMax[1] - pMin[1]) / 2;
-      const _hz  = (pMax[2] - pMin[2]) / 2;
-      // support-function extent of the AABB along the log axis (how far the seg extended in each direction)
-      const _hlen = Math.abs(_ax[0]) * _hx + Math.abs(_ax[1]) * _hy + Math.abs(_ax[2]) * _hz;
-      // find surviving neighbours by index (index-based is unambiguous; adj[0]/[1] ordering is position-dependent)
-      const _prevSeg = segIdx > 0 ? log.segs[segIdx - 1] : null;
-      const _nextSeg = segIdx < log.segs.length - 1 ? log.segs[segIdx + 1] : null;
-      // lower face = center − halfLen * axis3 = the stump-facing end of the removed seg
-      // (butt→tip = +Y in log.mesh local space; lower face = toward stump = lower local-Y → up=true = teeth +Y into gap)
-      if (_prevSeg && !_prevSeg.dead) {
-        const _lp = new THREE.Vector3(_cx - _ax[0] * _hlen, _cy - _ax[1] * _hlen, _cz - _ax[2] * _hlen);
-        log.mesh.worldToLocal(_lp);
-        log.mesh.add(this._splinterMesh(_lp.x, _lp.y, _lp.z, _r, ((sid * 2654435761) >>> 0) || 1, true, SPLINTER_MAT));
-      }
-      // upper face = center + halfLen * axis3 = the tip-facing end of the removed seg → up=false = teeth −Y into gap
-      if (_nextSeg && !_nextSeg.dead) {
-        const _lp = new THREE.Vector3(_cx + _ax[0] * _hlen, _cy + _ax[1] * _hlen, _cz + _ax[2] * _hlen);
-        log.mesh.worldToLocal(_lp);
-        log.mesh.add(this._splinterMesh(_lp.x, _lp.y, _lp.z, _r, (((sid + 1) * 2654435761) >>> 0) ^ 0xa5, false, SPLINTER_MAT));
-      }
-    } catch (e) { console.warn('[forest] gap splinters failed', e); }
   }
 
   consumeProp(rec) {                                                                              // FireManager burnout consumes a prop
