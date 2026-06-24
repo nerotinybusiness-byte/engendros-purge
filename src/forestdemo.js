@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { makeTree } from './props/generators/tree.js';
 import { makeBush, makeShrub } from './props/generators/groundcover.js';
-import { makePart, MATERIALS, makeHinge, stepBody, resolveHit, binFallenAABBs, binFallenGeometry, orphanedCells, snapPlan, splitGeomAtY, flatFalls, makeSplinters } from './destruct.js';
+import { makePart, MATERIALS, makeHinge, stepBody, resolveHit, binFallenAABBs, binFallenGeometry, orphanedCells, snapPlan, splitGeomAtY, flatFalls, makeSplinters, mergeBags } from './destruct.js';
 import { rr, voxelMaterial, foliageFadeMaterial, makeRNG } from './util.js';
 import { FOLIAGE_FADE_NEAR, FOLIAGE_FADE_FAR, FOLIAGE_FADE_GATE } from './tuning.js';
 
@@ -218,30 +218,49 @@ export class ForestDemo {
     const logId = 200000 + (rec.id % 6000) * 16 + Math.min(15, snapN);   // unique fallen-log id per (tree, snap)
     rec.snapN = snapN + 1;
 
+    // ── BREAK SPLINTERS helpers — moved BEFORE branches so _spl/_splR can be computed per-branch ──
+    const _fullH = rec.fullH || rec.height || 1;
+    const _cl = (yt) => {                                   // leaning-centreline [lx,lz] at local height yt (pre-yaw)
+      const sp = rec.spine;
+      if (!sp || !sp.length) return [0, 0];
+      if (yt <= sp[0][1]) return [sp[0][0], sp[0][2]];
+      for (let i = 0; i < sp.length - 1; i++) { const a = sp[i], b = sp[i + 1]; if (yt <= b[1] + 1e-6) { const tt = (yt - a[1]) / ((b[1] - a[1]) || 1); return [a[0] + (b[0] - a[0]) * tt, a[2] + (b[2] - a[2]) * tt]; } }
+      const e = sp[sp.length - 1]; return [e[0], e[2]];
+    };
+    // helper: bake top-wood geometry with splinter crown at its cut face; bbox min.y = the cut y in local space
+    const _bakeTop = (geo, splR, seed) => {
+      geo.computeBoundingBox();
+      const cy = Math.abs(geo.boundingBox.min.y) < 0.05 ? 0 : geo.boundingBox.min.y;
+      return this._bakeSplinters(geo, 0, cy, 0, splR, seed ^ 0x5a, false);
+    };
+
     let topWoodMesh = null, topLeafMesh = null, breakY, liveStump, stumpMesh = null;
     if (breakAtOverride === 0) {
       // UPROOT — the WHOLE tree topples from the base, root and all, NO stump (the ground was dug out from
       // under it). Reuse the current standing geometry (wood + leaf) as the falling top, hinged at the base.
       breakY = 0; liveStump = false;
+      const _splR = rec.trunkR || 0.3;
       const wm = rec._woodMesh || (rec.mesh && (rec.mesh.isMesh ? rec.mesh : rec.mesh.children.find((c) => c.isMesh && c !== rec.leafMesh)));
-      if (wm && wm.geometry) { topWoodMesh = new THREE.Mesh(wm.geometry.clone(), wm.material); topWoodMesh.castShadow = true; }
+      if (wm && wm.geometry) { topWoodMesh = new THREE.Mesh(_bakeTop(wm.geometry.clone(), _splR, (rec.id * 2654435761) >>> 0), wm.material); topWoodMesh.castShadow = true; }
       if (rec.leafMesh && rec.leafMesh.geometry) { topLeafMesh = new THREE.Mesh(rec.leafMesh.geometry.clone(), FOLIAGE_OPAQUE); topLeafMesh.castShadow = true; }
     } else if (snapN === 0) {
       // FIRST snap — makeTree gives a clean stump + a coherent crowned top (canopy clamped onto the top).
       const split = makeTree({ species: rec.species, seed: rec.seed, scale: rec.scale, breakAt, damage: rec.charred ? 'charred' : undefined });
       breakY = split.breakY;
-      topWoodMesh = new THREE.Mesh(split.topWoodGeometry, split.material); topWoodMesh.castShadow = true;
-      if (split.topLeafGeometry) { topLeafMesh = new THREE.Mesh(split.topLeafGeometry, FOLIAGE_OPAQUE); topLeafMesh.castShadow = true; }
       liveStump = breakY >= STUB_FLOOR;   // FIX 1: charred trees always take the live-stump path (shootable stump)
-      stumpMesh = new THREE.Mesh(split.stumpWoodGeometry, split.material);
+      const _spl = _cl(breakY), _splR = (rec.trunkR || 0.3) * (1 - 0.6 * (breakY / _fullH));   // FIX 4a: pad-free
+      topWoodMesh = new THREE.Mesh(_bakeTop(split.topWoodGeometry, _splR, (rec.id * 2654435761) >>> 0), split.material); topWoodMesh.castShadow = true;
+      if (split.topLeafGeometry) { topLeafMesh = new THREE.Mesh(split.topLeafGeometry, FOLIAGE_OPAQUE); topLeafMesh.castShadow = true; }
+      stumpMesh = new THREE.Mesh(this._bakeSplinters(split.stumpWoodGeometry, _spl[0], breakY, _spl[1], _splR, (rec.id * 2654435761) >>> 0, true), split.material);
       if (!liveStump) {
         // FIX 2: stump too short to be re-snappable (e.g. birch sapling breakAt=0.1 → breakY<STUB_FLOOR)
         // → topple the WHOLE tree from the base, no immortal non-shootable stub. Mirror the uproot branch.
         if (topWoodMesh) topWoodMesh.geometry.dispose();
         if (topLeafMesh) topLeafMesh.geometry.dispose();
         stumpMesh = null; breakY = 0;
+        const _splR2 = rec.trunkR || 0.3;
         const wm = rec._woodMesh || (rec.mesh && (rec.mesh.isMesh ? rec.mesh : rec.mesh.children.find((c) => c.isMesh && c !== rec.leafMesh)));
-        topWoodMesh = wm && wm.geometry ? new THREE.Mesh(wm.geometry.clone(), wm.material) : null;
+        topWoodMesh = wm && wm.geometry ? new THREE.Mesh(_bakeTop(wm.geometry.clone(), _splR2, (rec.id * 2654435761) >>> 0), wm.material) : null;
         if (topWoodMesh) topWoodMesh.castShadow = true;
         topLeafMesh = rec.leafMesh && rec.leafMesh.geometry ? new THREE.Mesh(rec.leafMesh.geometry.clone(), FOLIAGE_OPAQUE) : null;
         if (topLeafMesh) topLeafMesh.castShadow = true;
@@ -254,28 +273,17 @@ export class ForestDemo {
       if (!wm || !wm.geometry || prevHeight < STUB_FLOOR + 0.6 || cut >= prevHeight - 0.3) {
         // too short to re-snap → topple the WHOLE remaining stump as one piece (no live stump left)
         breakY = 0; liveStump = false;
-        if (wm && wm.geometry) { topWoodMesh = new THREE.Mesh(wm.geometry.clone(), wm.material); topWoodMesh.castShadow = true; }
+        const _splR = rec.trunkR || 0.3;
+        if (wm && wm.geometry) { topWoodMesh = new THREE.Mesh(_bakeTop(wm.geometry.clone(), _splR, (rec.id * 2654435761) >>> 0), wm.material); topWoodMesh.castShadow = true; }
       } else {
         breakY = cut; liveStump = true;
+        const _spl = _cl(breakY), _splR = (rec.trunkR || 0.3) * (1 - 0.6 * (breakY / _fullH));   // FIX 4a: pad-free
         const a = wm.geometry.attributes;
         const sp = splitGeomAtY(a.position.array, a.color && a.color.array, a.normal && a.normal.array, a.uv && a.uv.array, 1, cut);
-        topWoodMesh = new THREE.Mesh(this._geomFrom(sp.hi), wm.material); topWoodMesh.castShadow = true;
-        stumpMesh = new THREE.Mesh(this._geomFrom(sp.lo), wm.material);
+        topWoodMesh = new THREE.Mesh(_bakeTop(this._geomFrom(sp.hi), _splR, (rec.id * 2654435761) >>> 0), wm.material); topWoodMesh.castShadow = true;
+        stumpMesh = new THREE.Mesh(this._bakeSplinters(this._geomFrom(sp.lo), _spl[0], breakY, _spl[1], _splR, (rec.id * 2654435761) >>> 0, true), wm.material);
       }
     }
-
-    // ── BREAK SPLINTERS — torn raw wood at the snap, on both faces (replaces the flat-cut look) ──
-    const _fullH = rec.fullH || rec.height || 1;
-    const _cl = (yt) => {                                   // leaning-centreline [lx,lz] at local height yt (pre-yaw)
-      const sp = rec.spine;
-      if (!sp || !sp.length) return [0, 0];
-      if (yt <= sp[0][1]) return [sp[0][0], sp[0][2]];
-      for (let i = 0; i < sp.length - 1; i++) { const a = sp[i], b = sp[i + 1]; if (yt <= b[1] + 1e-6) { const tt = (yt - a[1]) / ((b[1] - a[1]) || 1); return [a[0] + (b[0] - a[0]) * tt, a[2] + (b[2] - a[2]) * tt]; } }
-      const e = sp[sp.length - 1]; return [e[0], e[2]];
-    };
-    const _spl = _cl(breakY);
-    const _splR = (rec.trunkR || 0.3) * (1 - 0.6 * (breakY / _fullH));   // FIX 4a: removed +0.1 collision-pad leak
-    const _splMat = (stumpMesh && stumpMesh.material) || (topWoodMesh && topWoodMesh.material) || SPLINTER_MAT;
 
     // remove the OLD standing mesh + its wind entry
     const oldMesh = rec.mesh;
@@ -289,21 +297,17 @@ export class ForestDemo {
       this._buildTrunkBands(rec, breakY, Math.max(2, Math.round(6 * breakY / fullH)));   // re-snappable: rebuild the shorter bole's bands
       if (rec.part) { rec.part.dead = false; rec.part.dhp = Math.max(8, TREE_HP[rec.cls] * (breakY / fullH));   // a tall stump still resists; a stub dies in one more burst
         const sh = (rec.trunkR || 0.3) + 0.12; rec.part.min = [rec.x - sh, y0, rec.z - sh]; rec.part.max = [rec.x + sh, y0 + breakY, rec.z + sh]; }
-      stumpMesh.add(this._splinterMesh(_spl[0], breakY, _spl[1], _splR, (rec.id * 2654435761) >>> 0, true, _splMat));
+      // splinters are now baked into stumpMesh.geometry — no separate child mesh needed
     } else {
       rec.mesh = null; rec.standing = false; rec._woodMesh = null; if (rec.part) rec.part.dead = true;   // inert stub — off the live trees
-      if (stumpMesh) { stumpMesh.position.set(rec.x, y0, rec.z); stumpMesh.rotation.y = rec.yaw; stumpMesh.castShadow = true; this.scene.add(stumpMesh); this.stumps.push(stumpMesh);
-        stumpMesh.add(this._splinterMesh(_spl[0], breakY, _spl[1], _splR, (rec.id * 2654435761) >>> 0, true, _splMat)); }
+      if (stumpMesh) { stumpMesh.position.set(rec.x, y0, rec.z); stumpMesh.rotation.y = rec.yaw; stumpMesh.castShadow = true; this.scene.add(stumpMesh); this.stumps.push(stumpMesh); }
       if (breakY > 0.05) { const sh = (rec.trunkR || 0.3) + 0.12, sb = { min: new THREE.Vector3(rec.x - sh, y0, rec.z - sh), max: new THREE.Vector3(rec.x + sh, y0 + Math.max(0.4, breakY), rec.z + sh) }; this.world.boxes.push(sb); this.world.grid.addBox(sb); this.stumpBoxes.push(sb); }
     }
 
     // ── the falling top ──
     if (topWoodMesh) {
       const top = new THREE.Group(); top.rotation.y = rec.yaw; top.add(topWoodMesh); if (topLeafMesh) top.add(topLeafMesh);
-      // confirm the top's break is at local y≈0 (re-zeroed); if its bbox min.y is materially > 0, use that as cy
-      topWoodMesh.geometry.computeBoundingBox();
-      const _topCutY = Math.abs(topWoodMesh.geometry.boundingBox.min.y) < 0.05 ? 0 : topWoodMesh.geometry.boundingBox.min.y;
-      top.add(this._splinterMesh(0, _topCutY, 0, _splR, ((rec.id * 2654435761) >>> 0) ^ 0x5a, false, topWoodMesh.material));
+      // splinters are now baked into topWoodMesh.geometry — no separate child mesh needed
       const pivot = new THREE.Group(); pivot.position.set(rec.x, y0 + breakY, rec.z); pivot.add(top); this.scene.add(pivot);
       const length = Math.max(0.5, prevHeight - breakY);
       const groundAt = this.world.terrain ? (gx, gz) => this.world.terrain.terrainHeightAt(gx, gz) : null;
@@ -347,6 +351,23 @@ export class ForestDemo {
     if (bag.colors) g.setAttribute('color', new THREE.Float32BufferAttribute(bag.colors, 3));
     g.computeBoundingSphere();
     return g;
+  }
+
+  // Bake a splinter crown directly INTO a wood geometry: read its attrs into a bag, merge a makeSplinters
+  // crown, return a new geometry. The teeth become triangles of THIS piece's mesh → they fall/burn/move/
+  // disappear/re-bin with it automatically (no separate object). radius = the REAL visual wood radius at
+  // the cut (not the padded collision radius); up flips teeth direction (stump = up, falling top = down).
+  _bakeSplinters(geometry, cx, cy, cz, radius, seed, up) {
+    const a = geometry.attributes;
+    const bag = {
+      positions: Array.from(a.position.array),
+      colors:    a.color  ? Array.from(a.color.array)  : null,
+      normals:   a.normal ? Array.from(a.normal.array) : null,
+      uvs:       a.uv     ? Array.from(a.uv.array)     : null,
+    };
+    const r = Math.max(0.08, radius);
+    const crown = makeSplinters(cx, cy, cz, r, (seed >>> 0) || 1, 9, r * 0.4, Math.min(r * 1.3, 0.85), up, WOOD_RAW);
+    return this._geomFrom(mergeBags(bag, crown));
   }
 
   // Build a splinter "torn wood" crown mesh for a break face, in the LOCAL frame of the piece it parents
