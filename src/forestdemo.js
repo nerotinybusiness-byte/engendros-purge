@@ -247,34 +247,19 @@ export class ForestDemo {
       // FIRST snap — makeTree gives a clean stump + a coherent crowned top (canopy clamped onto the top).
       const split = makeTree({ species: rec.species, seed: rec.seed, scale: rec.scale, breakAt, damage: rec.charred ? 'charred' : undefined });
       breakY = split.breakY;
-      liveStump = breakY >= STUB_FLOOR;   // FIX 1: charred trees always take the live-stump path (shootable stump)
+      liveStump = true;   // C3: first snap always leaves a live shootable stump (only the above-cut part falls)
       const _spl = _cl(breakY), _splR = (rec.trunkR || 0.3) * (1 - 0.6 * (breakY / _fullH));   // FIX 4a: pad-free
       topWoodMesh = new THREE.Mesh(_bakeTop(split.topWoodGeometry, _splR, (rec.id * 2654435761) >>> 0), split.material); topWoodMesh.castShadow = true;
       if (split.topLeafGeometry) { topLeafMesh = new THREE.Mesh(split.topLeafGeometry, FOLIAGE_OPAQUE); topLeafMesh.castShadow = true; }
       stumpMesh = new THREE.Mesh(this._bakeSplinters(split.stumpWoodGeometry, _spl[0], breakY, _spl[1], _splR, (rec.id * 2654435761) >>> 0, true), split.material);
-      if (!liveStump) {
-        // FIX 2: stump too short to be re-snappable (e.g. birch sapling breakAt=0.1 → breakY<STUB_FLOOR)
-        // → topple the WHOLE tree from the base, no immortal non-shootable stub. Mirror the uproot branch.
-        if (topWoodMesh) topWoodMesh.geometry.dispose();
-        if (topLeafMesh) topLeafMesh.geometry.dispose();
-        stumpMesh = null; breakY = 0;
-        const _splR2 = rec.trunkR || 0.3;
-        const wm = rec._woodMesh || (rec.mesh && (rec.mesh.isMesh ? rec.mesh : rec.mesh.children.find((c) => c.isMesh && c !== rec.leafMesh)));
-        topWoodMesh = wm && wm.geometry ? new THREE.Mesh(_bakeTop(wm.geometry.clone(), _splR2, (rec.id * 2654435761) >>> 0), wm.material) : null;
-        if (topWoodMesh) topWoodMesh.castShadow = true;
-        topLeafMesh = rec.leafMesh && rec.leafMesh.geometry ? new THREE.Mesh(rec.leafMesh.geometry.clone(), FOLIAGE_OPAQUE) : null;
-        if (topLeafMesh) topLeafMesh.castShadow = true;
-      }
     } else {
       // RE-snap — geometry-split the bare stump wood at the cut (no crown left to preserve).
       const wm = rec._woodMesh || (rec.mesh && rec.mesh.isMesh ? rec.mesh : null);
       let cut = breakAt * fullH;                              // local height above base (snapPlan returns (hitY-y0)/fullH)
       cut = Math.max(STUB_FLOOR, Math.min(prevHeight - 0.4, cut));
       if (!wm || !wm.geometry || prevHeight < STUB_FLOOR + 0.6 || cut >= prevHeight - 0.3) {
-        // too short to re-snap → topple the WHOLE remaining stump as one piece (no live stump left)
-        breakY = 0; liveStump = false;
-        const _splR = rec.trunkR || 0.3;
-        if (wm && wm.geometry) { topWoodMesh = new THREE.Mesh(_bakeTop(wm.geometry.clone(), _splR, (rec.id * 2654435761) >>> 0), wm.material); topWoodMesh.castShadow = true; }
+        // C3: too short to re-snap → fully remove (crumbles, nothing falls; debris fired in stump section)
+        breakY = 0; liveStump = false; stumpMesh = null; topWoodMesh = null;
       } else {
         breakY = cut; liveStump = true;
         const _spl = _cl(breakY), _splR = (rec.trunkR || 0.3) * (1 - 0.6 * (breakY / _fullH));   // FIX 4a: pad-free
@@ -299,9 +284,11 @@ export class ForestDemo {
         const sh = (rec.trunkR || 0.3) + 0.12; rec.part.min = [rec.x - sh, y0, rec.z - sh]; rec.part.max = [rec.x + sh, y0 + breakY, rec.z + sh]; }
       // splinters are now baked into stumpMesh.geometry — no separate child mesh needed
     } else {
-      rec.mesh = null; rec.standing = false; rec._woodMesh = null; if (rec.part) rec.part.dead = true;   // inert stub — off the live trees
-      if (stumpMesh) { stumpMesh.position.set(rec.x, y0, rec.z); stumpMesh.rotation.y = rec.yaw; stumpMesh.castShadow = true; this.scene.add(stumpMesh); this.stumps.push(stumpMesh); }
-      if (breakY > 0.05) { const sh = (rec.trunkR || 0.3) + 0.12, sb = { min: new THREE.Vector3(rec.x - sh, y0, rec.z - sh), max: new THREE.Vector3(rec.x + sh, y0 + Math.max(0.4, breakY), rec.z + sh) }; this.world.boxes.push(sb); this.world.grid.addBox(sb); this.stumpBoxes.push(sb); }
+      // uproot (breakAtOverride===0, whole tree falls, no stump) or fully-remove re-snap (stump crumbles)
+      rec.mesh = null; rec.standing = false; rec._woodMesh = null; if (rec.part) rec.part.dead = true;
+      // C3: fully-remove only (not uproot) — emit debris burst where the stump crumbled
+      if (breakAtOverride !== 0) this.debris && this.debris.burst('splints', [rec.x, y0 + 0.2, rec.z], sd);
+      // C3: no inert-stub collision box (stump is gone, must not leave a bullet-immune phantom)
     }
 
     // ── the falling top ──
