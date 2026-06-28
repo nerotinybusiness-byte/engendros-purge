@@ -1,0 +1,8 @@
+# Downloaded third-party reference material is kept LOCAL only (copyright hygiene
+# for a public repo). Source URLs live in dossier.json. dossier.json itself is tracked.
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.gif
+*.pdf

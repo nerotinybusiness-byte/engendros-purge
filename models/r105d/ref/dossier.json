@@ -1,0 +1,95 @@
+{
+  "id": "r105d",
+  "title": "Radiostanice R-105d — Czechoslovak (ČSLA, Tesla Pardubice) man-pack VHF FM radio station, metal-cased R-105/R-105D family",
+  "era": "Soviet R-105 family (1960s); R-105D = modernized R-105 with a built-in retranslation (relay) unit; licence-built for the ČSLA by Tesla Pardubice with a Czech-language (Latin) control panel — NOT Cyrillic. 36.0–46.1 MHz, 1–1.2 W FM, carried on the back with a webbing harness.",
+  "sources": {
+    "valka": "https://www.valka.cz/SOV-R-105-108-109-114-prenosna-radiostanica-t38027 — radio unit 310×170×325 mm; working set ~20.5 kg; packed set ~46 kg; grey rough-enamel front panel ('típickým šedým hrubým emailem'); transport crate 620×350×420 mm; Czech control inventory",
+    "radiomuseum": "https://www.radiomuseum.org/r/b_8865_r_105m_p_105m.html — R-105M 170×325×310 mm (W×H×D); same body envelope as R-105D; R-105M plastic, ~15 kg",
+    "greenradio": "https://www.greenradio.de/e_r105m.htm — 310×170×325 mm",
+    "army_surplus": "https://www.army-surplus.cz/radiova-stanice-r-105d-csla-original/ — R-105d ČSLA original ~37×17,5×35 cm; bare transceiver ~13 kg; case 'various shades of green'; licence-built Tesla Pardubice; sold without straps/belt/antenna",
+    "feldfunker": "https://feldfunker-la7sna.com/radio_r105d.htm — aluminium-alloy chassis & covers, painted 'Telegreen', waterproof to 0.5 m; AŠ-1,5 Kulikov flexible whip 1.5 m (→2.7 m, ~3.6 m); back cushion + canvas straps; 40 m beam-wire antenna; ~21 kg working",
+    "ruwiki": "https://ru.wikipedia.org/wiki/Р-105Д — 36–46.1 MHz, 203 channels, ≤21 kg working / 46 kg full set; Cyrillic panel on Soviet issue (AVOID)",
+    "vu9967": "https://www.vu9967.cz/technika/radiove-stanice/radiove-stanice-typu-astra — Czech control inventory & verbatim Czech panel labels; confirms Latin (Czech) script, not Cyrillic",
+    "photos_local": "ref/Untitled2.png (Czech R-105d front panel, all labels legible) · ref/Untitled.png (top: antenna mount, leather handle, latches, bent antenna) · ref/how-was-this-r105d-radio-worn-it-was-used-by-the-nva-*.jpg (back harness: tan canvas shoulder straps + leather keepers + waist strap) · ref/r105d.jpg (3/4 lid-open) · ref/r105d1.jpg & ref/s-l1200.jpg (Soviet Р-105Д/М Cyrillic variants — AVOID)"
+  },
+  "specifications": {
+    "body_dims": {
+      "width_mm": 170,
+      "height_mm": 325,
+      "depth_mm": 310,
+      "src": "radiomuseum",
+      "quote": "170 × 325 × 310 mm (W×H×D); corroborated '310×170×325' by valka & greenradio; army_surplus gives ~175×350×370 (incl. rails/handles)",
+      "note": "narrow upright metal case; the grey control panel is on the FRONT (panel face = 170 W × 325 H); 310 deep. Worn on the back with the panel facing outward."
+    },
+    "mass_kg": {
+      "bare": 13,
+      "working": 20.5,
+      "src": "army_surplus",
+      "quote": "bare transceiver ~13 kg (army_surplus); ~20.5–21 kg working set with batteries + harness (valka, feldfunker, ruwiki)"
+    },
+    "freq": {
+      "range_mhz": "36.0–46.1",
+      "channels": 203,
+      "power_w": "1–1.2",
+      "src": "ruwiki",
+      "quote": "36–46.1 MHz, 50 kHz steps, 203 channels, FM (F3), 1–1.2 W TX (ruwiki, vu9967)"
+    },
+    "materials": {
+      "case": "aluminium alloy, painted military green ('Telegreen')",
+      "panel": "grey rough/textured enamel plate",
+      "knobs": "black bakelite",
+      "src": "feldfunker",
+      "quote": "aluminium-alloy chassis & covers, 'Telegreen' green paint (feldfunker); grey rough-enamel front panel (valka); ČSLA licence-build Tesla Pardubice (army_surplus)"
+    },
+    "antenna": {
+      "type": "AŠ-1,5 Kulikov flexible whip",
+      "stowed_m": 1.5,
+      "extended_m": 2.7,
+      "construction": "deployed it stands as a near-straight telescopic/segmented whip of decreasing-diameter sections rising from a prominent BRASS knurled base + nut on the top of the case; the big black rubber ARC seen over the top is the headset/handset cable, NOT the antenna",
+      "mount": "brass knurled base screwed to the antenna head/socket on top of the case toward the panel/front edge (no spring base)",
+      "src": "feldfunker",
+      "quote": "АШ-1,5 1.5 m segmented whip; ref/6086bfa133e46e93a984bf2035adde9f.jpg shows the straight telescopic whip on a brass base, with the separate black headset cable arcing from a top-left connector"
+    },
+    "harness": {
+      "layout": "plastic-covered back cushion/pad against the operator + two canvas (webbing) shoulder straps with leather keeper loops + a waist strap; attaches to lugs on the case",
+      "colour": "khaki/tan cotton webbing, reddish-brown leather keepers",
+      "src": "feldfunker",
+      "quote": "back cushion + canvas straps (feldfunker); ref/how-was-this-r105d-radio-worn-*.jpg shows tan webbing shoulder straps, leather keepers, a waist strap"
+    },
+    "panel_layout": {
+      "layout": "tall grey panel, lid hinged on the left. TOP: round tuning-scale window (centre, a graduated drum reading ~455/365) with 'LADĚNÍ ANTÉNY' (left, stepped 1-2-3-4 inductance + butterfly cap) and 'ARETACE STUPNICE' scale-lock + 'NASTAVENÍ KMITOČTU' (right) above a 4-hole black socket cluster. MIDDLE: rotary selector 'DÁLK. OVLÁD. A RETRANSLACE' (positions LINKA VYP / SLUŽ. LINKA / DÁLK. OVL. / VYSÍLÁNÍ RETR. / PŘÍJEM RETR. / VÝZVA); to its right the 'ANT. PROUD / NAPĚTÍ AKU' toggle + a round analog V-meter. LOWER: a white blank service plate, the red warning 'POZOR! NEPŘÍTEL NASLOUCHÁ', a 'KALIBRÁTOR STISKNOUT' button, the main on/off (VYP/ZAP) toggle, and the nameplate 'R-105d N°…'. The hinged lid carries the instruction plate 'NÁVOD K OBSLUZE RÁDIOVÉ STANICE' + antenna-deployment diagrams on its inner face.",
+      "src": "photos_local",
+      "quote": "ref/Untitled2.png (all Czech labels legible), corroborated by the vu9967 control inventory"
+    },
+    "markings_cz": {
+      "list": ["LADĚNÍ ANTÉNY", "NASTAVENÍ KMITOČTU", "ARETACE STUPNICE", "DÁLK. OVLÁD. A RETRANSLACE", "LINKA VYP", "SLUŽ. LINKA", "DÁLK. OVL.", "VYSÍLÁNÍ RETR.", "PŘÍJEM RETR.", "VÝZVA", "POZOR! NEPŘÍTEL NASLOUCHÁ", "ANT. PROUD", "NAPĚTÍ AKU", "KALIBRÁTOR STISKNOUT", "NÁVOD K OBSLUZE RÁDIOVÉ STANICE", "R-105d"],
+      "colour": "black engraved on grey; 'POZOR! NEPŘÍTEL NASLOUCHÁ' in RED",
+      "src": "photos_local",
+      "quote": "ref/Untitled2.png; Soviet Cyrillic equivalents (Внимание! противник подслушивает, НАСТРОЙКА АНТЕННЫ, СТОПОР ШКАЛЫ, …) are AVOIDED per vu9967 — this is the Czech (Tesla) panel"
+    },
+    "top_face": {
+      "layout": "brass knurled antenna base (toward the front/panel edge) with the telescopic whip rising from it; a leather carry handle (centre); a brass headset/handset connector (top-left) with the black rubber cable arcing from it; side lever clasps on the right edge, hinges on the left",
+      "src": "photos_local",
+      "quote": "ref/6086bfa133e46e93a984bf2035adde9f.jpg, ref/Untitled.png"
+    },
+    "lid_face": {
+      "layout": "the closed front lid (door) is a stamped steel sheet carrying TWO diagonal raised ribs forming an X corner-to-corner, with a raised circular boss where they cross; riveted perimeter; hinged on the left edge, two lever clasps on the right. The case's four vertical corners carry MASSIVE rounded corner-guard rails (not thin rods).",
+      "src": "photos_local",
+      "quote": "ref/tschechoslowakei-tornisterfunkgeraet-r105d-nach-russischer-bauart-funktion-nicht-geprueft~6.jpg (closed lid X-cross + centre boss) and ~8.jpg (rounded corner guards + stencilled serial '320065')"
+    }
+  },
+  "derivation": {
+    "panel_feature_layout_m": {
+      "value": "panel face = 0.17 W × 0.325 H on the +Z front; controls placed by proportional reading of ref/Untitled2.png against the 170 mm width",
+      "formula": "feature_pos = (pixel offset / panel pixel size) × panel dimension",
+      "inputs": "body_dims (radiomuseum), panel_layout (photos_local)",
+      "note": "honest photo-proportional placement of sub-features; no invented absolute sub-dimensions"
+    }
+  },
+  "needs": [
+    "exact panel sub-feature dimensions (knob diameters, meter diameter, socket-cluster size) — placed by photo proportion against the 170 mm panel width, not individually sourced",
+    "exact webbing colour/width and the case lug positions for the harness — read from ref/how-was-this-r105d-radio-worn-*.jpg, not from a written spec",
+    "verbatim letter-for-letter spelling of 'KALIBRÁTOR STISKNOUT' and 'NÁVOD K OBSLUZE RÁDIOVÉ STANICE' on an R-105d — corroborated by function + the Untitled2.png photo, not a manual scan",
+    "antenna AŠ-1,5 exact stowed segment geometry — modeled as a bent bead-whip per ref/Untitled.png"
+  ]
+}
