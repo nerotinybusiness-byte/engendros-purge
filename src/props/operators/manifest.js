@@ -32,6 +32,7 @@ export const MANIFEST = {
   tube:        { args: ['pts', 'tube'],           dims: ['tube'],              anchor: 'center' },
   texturedDisc: { args: ['r'],                     dims: ['r'],                anchor: 'center' },
   decal:       { args: ['w', 'h'],                dims: ['w', 'h'],            anchor: 'center' },
+  texturedPanel: { args: ['w', 'h'],              dims: ['w', 'h'],            anchor: 'center' },
   loaf:        { args: ['w', 'h', 'd'],           dims: ['w', 'h', 'd'],       anchor: 'center' },
   // P-37 radar (structural mesh/emblem + round running-gear/pipework/mast)
   meshReflector:{ args: ['w', 'h'],               dims: ['w', 'h'],            anchor: 'center' },

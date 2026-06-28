@@ -41,6 +41,13 @@ const roundExtents = {
     if (ax === 'x') return { min: [-th, -hw, -hh], max: [th, hw, hh] };
     return { min: [-hw, -hh, -th], max: [hw, hh, th] };
   },
+  // flat textured metal panel w×h, ~3 mm proud along its normal axis (same envelope as decal)
+  texturedPanel: (a) => {
+    const hw = a.w / 2, hh = a.h / 2, th = 0.003, ax = a.axis ?? 'z';
+    if (ax === 'y') return { min: [-hw, -th, -hh], max: [hw, th, hh] };
+    if (ax === 'x') return { min: [-th, -hw, -hh], max: [th, hw, hh] };
+    return { min: [-hw, -hh, -th], max: [hw, hh, th] };
+  },
   // rounded stadium loaf shell — honest w×h×d box (the profile is pre-shrunk by the bevel)
   loaf: (a) => ({ min: [-a.w / 2, -a.h / 2, -a.d / 2], max: [a.w / 2, a.h / 2, a.d / 2] }),
   // road wheel/tyre: radius r perpendicular to the axle, width w along it; twin tyres

@@ -366,6 +366,91 @@ export function decal(b, a, t, o) {
   return mesh;
 }
 
+// texturedPanel — a flat rectangular metal panel carrying a generated HIGH-RES CanvasTexture:
+// a rough painted-enamel base (palette tones), orange-peel speckle, weather streaks, a riveted
+// border, and an optional BAKED RELIEF — kind:'lid' draws the R-105's stamped X-cross ribs + a
+// raised centre boss (the closed-lid signature), kind:'plate' adds a stencilled serial. Real
+// raised geometry would cost dozens of boxes; here the highlight/shadow shading reads as relief
+// at a fraction of the polycount. Returns its own Mesh (buildSpec drops it into the part group).
+// Default axis z (normal +Z), center-anchored. Args: w, h; opts: kind, stencil, axis, seed, tone.
+export function texturedPanel(b, a, t, o) {
+  const g = new THREE.PlaneGeometry(a.w, a.h);
+  const mat = new THREE.MeshLambertMaterial({ map: makePanelTexture(t, a) });
+  const mesh = new THREE.Mesh(g, mat);
+  const or = NORMAL[a.axis ?? 'z'];
+  mesh.rotation.set(or.rx || 0, or.ry || 0, or.rz || 0);
+  mesh.position.set(o.x, o.y, o.z);
+  return mesh;
+}
+
+// makePanelTexture — the metal-panel canvas. Palette-locked (tones hi/mid/lo/slot/bright), with a
+// stable per-panel RNG so the weave/scuffs are identical across rebuilds. Exported for the viewer.
+export function makePanelTexture(tn, a = {}) {
+  const aspect = (a.w || 1) / (a.h || 1);
+  const H = 1024, W = Math.max(256, Math.min(2048, Math.round(H * aspect)));
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const c = cv.getContext('2d');
+  let s = ((a.seed ?? 0x051d) >>> 0);
+  const rnd = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
+
+  // 1) rough painted-enamel base: vertical light gradient (lit top → shadowed bottom)
+  const bg = c.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, tn.hi); bg.addColorStop(0.5, tn.mid); bg.addColorStop(1, tn.lo);
+  c.fillStyle = bg; c.fillRect(0, 0, W, H);
+
+  // 2) light orange-peel speckle + a few weather streaks — kept SUBTLE (the surface should read
+  // as painted metal, not noise; the owner asked to dial the high-res grain back while keeping the vibe)
+  for (let i = 0; i < 850; i++) {
+    const x = rnd() * W, y = rnd() * H, r = 1 + rnd() * 1.8;
+    c.fillStyle = rnd() < 0.5 ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.032)';
+    c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
+  }
+  for (let i = 0; i < 14; i++) {
+    const x = rnd() * W; c.strokeStyle = 'rgba(0,0,0,0.03)'; c.lineWidth = 1 + rnd() * 1.8;
+    c.beginPath(); c.moveTo(x, rnd() * H * 0.3); c.lineTo(x + (rnd() - 0.5) * 18, H * (0.4 + rnd() * 0.6)); c.stroke();
+  }
+
+  // 3) riveted border — softly domed rivets (radial gradient) around the perimeter
+  const rivet = (x, y, rr) => {
+    const gr = c.createRadialGradient(x - rr * 0.35, y - rr * 0.35, rr * 0.1, x, y, rr);
+    gr.addColorStop(0, 'rgba(255,255,255,0.38)'); gr.addColorStop(0.5, tn.mid); gr.addColorStop(1, 'rgba(0,0,0,0.4)');
+    c.fillStyle = gr; c.beginPath(); c.arc(x, y, rr, 0, 7); c.fill();
+  };
+  const pad = Math.min(W, H) * 0.055, rr = Math.max(2.5, Math.min(W, H) * 0.011);
+  const nX = Math.max(2, Math.round(W / (rr * 6))), nY = Math.max(2, Math.round(H / (rr * 6)));
+  for (let i = 0; i <= nX; i++) { const x = pad + (W - 2 * pad) * i / nX; rivet(x, pad, rr); rivet(x, H - pad, rr); }
+  for (let j = 1; j < nY; j++) { const y = pad + (H - 2 * pad) * j / nY; rivet(pad, y, rr); rivet(W - pad, y, rr); }
+
+  // 4) kind:'lid' — the stamped X-cross ribs + raised centre boss (R-105 closed-lid signature)
+  if (a.kind === 'lid') {
+    c.lineCap = 'round';
+    const m = pad * 1.7, X0 = m, X1 = W - m, Y0 = m, Y1 = H - m;
+    const rib = (x1, y1, x2, y2) => {
+      c.strokeStyle = 'rgba(0,0,0,0.38)'; c.lineWidth = Math.min(W, H) * 0.075; c.beginPath(); c.moveTo(x1, y1 + Math.min(W, H) * 0.018); c.lineTo(x2, y2 + Math.min(W, H) * 0.018); c.stroke();
+      c.strokeStyle = tn.bright; c.lineWidth = Math.min(W, H) * 0.05; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+      c.strokeStyle = tn.hi; c.lineWidth = Math.min(W, H) * 0.018; c.beginPath(); c.moveTo(x1, y1 - Math.min(W, H) * 0.013); c.lineTo(x2, y2 - Math.min(W, H) * 0.013); c.stroke();
+    };
+    rib(X0, Y0, X1, Y1); rib(X1, Y0, X0, Y1);
+    const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.17;
+    c.fillStyle = 'rgba(0,0,0,0.32)'; c.beginPath(); c.arc(cx, cy + Math.min(W, H) * 0.016, R, 0, 7); c.fill();
+    const rg = c.createRadialGradient(cx - R * 0.3, cy - R * 0.3, R * 0.1, cx, cy, R);
+    rg.addColorStop(0, tn.bright); rg.addColorStop(0.65, tn.mid); rg.addColorStop(1, tn.lo);
+    c.fillStyle = rg; c.beginPath(); c.arc(cx, cy, R, 0, 7); c.fill();
+    c.strokeStyle = 'rgba(0,0,0,0.3)'; c.lineWidth = Math.min(W, H) * 0.012; c.beginPath(); c.arc(cx, cy, R * 0.66, 0, 7); c.stroke();
+    c.fillStyle = 'rgba(0,0,0,0.6)'; c.beginPath(); c.arc(cx, cy, Math.min(W, H) * 0.012, 0, 7); c.fill();
+  }
+
+  // 5) optional stencilled serial (the white spray-stencil '320065' on the case)
+  if (a.stencil) {
+    c.fillStyle = 'rgba(228,228,216,0.84)'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = `bold ${Math.round(H * 0.058)}px "Stencil Std","Arial Narrow",sans-serif`;
+    c.save(); c.translate(W * 0.5, H * 0.13); c.fillText(String(a.stencil), 0, 0); c.restore();
+  }
+
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+  return tex;
+}
+
 // loaf — a rounded "stadium loaf" shell: a rounded-rectangle SIDE profile (depth d ×
 // height h, corner radius r) extruded across the width w with a beveled rim, so the
 // silhouette reads as the cast rounded clamshell of Soviet field instruments (ЛПР-1

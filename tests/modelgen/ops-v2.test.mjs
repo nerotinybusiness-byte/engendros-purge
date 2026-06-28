@@ -21,7 +21,7 @@ const PURE_OPS = {
 //    held out of the z-fight PROPERTY test only because their dense overlapping members carry
 //    intentional coplanar same-colour faces (and star's k=0 spoke has rz:0, which `isRotated` reads
 //    as un-rotated) that the box z-fight check would false-positive on.
-const ROUND_OPS = ['cylinder', 'disc', 'cone', 'deltaFins', 'texturedCylinder', 'torus', 'tube', 'texturedDisc', 'decal', 'loaf', 'wheel', 'pipe', 'tubeMast', 'star', 'meshReflector'];
+const ROUND_OPS = ['cylinder', 'disc', 'cone', 'deltaFins', 'texturedCylinder', 'torus', 'tube', 'texturedDisc', 'decal', 'texturedPanel', 'loaf', 'wheel', 'pipe', 'tubeMast', 'star', 'meshReflector'];
 
 function mock() {
   const calls = [];
@@ -57,6 +57,7 @@ const ROUND_SAMPLES = {
   tube: { pts: [[0, 0, 0], [0, 0.05, 0.05], [0.1, 0.05, 0.05]], tube: 0.011 },
   texturedDisc: { r: 0.045, axis: 'y' },
   decal: { w: 0.11, h: 0.14, axis: 'z' },
+  texturedPanel: { w: 0.15, h: 0.30, axis: 'z' },
   loaf: { w: 0.226, h: 0.108, d: 0.175 },
   wheel: { r: 0.45, w: 0.25, axis: 'x', twin: true },
   pipe: { pts: [[0, 0, 0], [0, 0.4, 0], [0.3, 0.4, 0]], r: 0.04 },
