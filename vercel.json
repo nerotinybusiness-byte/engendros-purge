@@ -26,6 +26,24 @@
           "value": "no-store, max-age=0"
         }
       ]
+    },
+    {
+      "source": "/archive.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
+    },
+    {
+      "source": "/archive/index.json",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
     }
   ]
 }

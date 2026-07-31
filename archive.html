@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Archiv dokumentů — ENGENDROS PURGE</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px; background: #14161a; color: #e6e2d8;
+    font: 15px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif;
+  }
+  header { max-width: 900px; margin: 0 auto 18px; }
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: .04em; }
+  h1 span { color: #b3a13f; }
+  .sub { color: #8b8778; font-size: 13px; margin: 0 0 12px; }
+  #q {
+    width: 100%; padding: 12px 14px; font-size: 16px; border-radius: 10px;
+    border: 1px solid #33363d; background: #1c1f24; color: #e6e2d8; outline: none;
+  }
+  #q:focus { border-color: #b3a13f; }
+  main { max-width: 900px; margin: 0 auto; display: grid; gap: 14px; }
+  .card {
+    background: #1c1f24; border: 1px solid #2a2d33; border-radius: 12px; padding: 14px 16px;
+  }
+  .card h2 { margin: 0; font-size: 17px; }
+  .date { color: #b3a13f; font-size: 12px; letter-spacing: .06em; }
+  .desc { color: #b5b0a2; margin: 6px 0 0; font-size: 14px; }
+  .thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .thumbs a img {
+    height: 110px; max-width: 200px; object-fit: cover; border-radius: 8px;
+    border: 1px solid #33363d; display: block;
+  }
+  .files { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .files a {
+    display: inline-block; padding: 7px 12px; border-radius: 8px; font-size: 13px;
+    background: #24272e; border: 1px solid #33363d; color: #e6e2d8; text-decoration: none;
+  }
+  .files a:active { background: #2e323a; }
+  .files a .sz { color: #8b8778; }
+  #status { text-align: center; color: #8b8778; padding: 30px 10px; }
+  #status code { color: #b3a13f; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📁 ARCHIV <span>DOKUMENTŮ</span></h1>
+  <p class="sub">Přílohy z iPadu uložené v repu — přidávání viz <code>archive/README.md</code>.</p>
+  <input id="q" type="search" placeholder="Hledat… (název, popis, soubor)">
+</header>
+<main id="list"></main>
+<div id="status">Načítám…</div>
+<script>
+(async () => {
+  const list = document.getElementById('list');
+  const status = document.getElementById('status');
+  const q = document.getElementById('q');
+  let entries = [];
+
+  const kb = (n) => n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(0) + ' kB' : (n / 1048576).toFixed(1) + ' MB';
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  function render(filter) {
+    const f = (filter || '').toLowerCase().trim();
+    const shown = entries.filter((e) => !f ||
+      (e.title + ' ' + (e.desc || '') + ' ' + e.files.map((x) => x.name).join(' ')).toLowerCase().includes(f));
+    list.innerHTML = shown.map((e) => {
+      const base = 'archive/' + encodeURIComponent(e.dir) + '/';
+      const imgs = e.files.filter((x) => x.kind === 'image');
+      const rest = e.files.filter((x) => x.kind !== 'image');
+      return '<div class="card">'
+        + '<div class="date">' + esc(e.date || '') + '</div>'
+        + '<h2>' + esc(e.title) + '</h2>'
+        + (e.desc ? '<p class="desc">' + esc(e.desc) + '</p>' : '')
+        + (imgs.length ? '<div class="thumbs">' + imgs.map((x) => {
+            const href = base + encodeURIComponent(x.name);
+            return '<a href="' + href + '" target="_blank"><img loading="lazy" src="' + href + '" alt="' + esc(x.name) + '"></a>';
+          }).join('') + '</div>' : '')
+        + (rest.length ? '<div class="files">' + rest.map((x) =>
+            '<a href="' + base + encodeURIComponent(x.name) + '" target="_blank">'
+            + (x.kind === 'pdf' ? '📄 ' : x.kind === 'text' ? '📝 ' : '📦 ')
+            + esc(x.name) + ' <span class="sz">' + kb(x.size) + '</span></a>').join('') + '</div>' : '')
+        + '</div>';
+    }).join('');
+    status.textContent = shown.length ? '' : 'Nic nenalezeno.';
+  }
+
+  try {
+    const res = await fetch('archive/index.json?t=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    entries = (await res.json()).entries || [];
+    status.textContent = '';
+    render('');
+  } catch (err) {
+    status.innerHTML = 'Index se nepodařilo načíst (' + esc(err.message) + ').<br>'
+      + 'Vygeneruj ho: <code>node scripts/archive-index.js</code> a servíruj přes HTTP.';
+    return;
+  }
+  q.addEventListener('input', () => render(q.value));
+})();
+</script>
+</body>
+</html>
