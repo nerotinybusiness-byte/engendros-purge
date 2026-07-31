@@ -1,0 +1,19 @@
+{
+  "generated": "2026-07-31T14:59:47.337Z",
+  "count": 1,
+  "entries": [
+    {
+      "dir": "2026-07-31-ukazkovy-zaznam",
+      "date": "2026-07-31",
+      "title": "Ukázkový záznam",
+      "desc": "Takhle vypadá jeden záznam v archivu — složka s datem v názvu, soubory a touhle",
+      "files": [
+        {
+          "name": "poznamka.md",
+          "size": 235,
+          "kind": "text"
+        }
+      ]
+    }
+  ]
+}
