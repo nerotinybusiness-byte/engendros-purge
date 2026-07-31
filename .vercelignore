@@ -4,6 +4,8 @@
 .playwright-mcp
 .agents
 docs
+# document archive (iPad attachments) lives in git only, never deploys
+archive
 # modelgen dev surface — the game only needs models/*/spec.json at runtime
 tools
 tests
