@@ -2,8 +2,16 @@
 
 **Autor zadání:** Martin. **Stav:** navrženo + postavena F0 kostra (viz níže).
 
-> Pozn.: v repu, issues ani PRkách žádný dřívější zápis o tomhle nápadu neexistoval —
-> tenhle dokument je první písemná verze, aby se nápad už neztrácel po chat sessions.
+> Pozn.: v repu, issues ani PRkách žádný dřívější zápis o tomhle nápadu neexistoval.
+> Nápad se probíral jen v chat sessions, které zanikly — přesně proto tenhle archiv
+> vzniká. Před touto větví proběhly **4 nemergnuté pokusy** (větve
+> `claude/ipad-document-storage-{45buiu,8c7gfb,a9l16r,c2b7t6}`, všechny 2026-07-31);
+> tahle verze je jejich sjednocení: implementace + prohlížečka z `45buiu`,
+> pravidla a „paměťová" instrukce pro Claude z `8c7gfb`. Jediný sporný bod mezi
+> návrhy — **deployovat archiv na Vercel (veřejná URL, prohlížečka z iPadu), nebo
+> držet jen v gitu (soukromější)** — je tu rozhodnut ve prospěch deploye, protože
+> procházení z iPadu je hlavní use-case; riziko řeší pravidlo „nic citlivého".
+> Staré větve jde po merge téhle smazat.
 
 ## Problém
 

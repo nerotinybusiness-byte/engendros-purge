@@ -16,8 +16,28 @@ aby nezmizely s koncem session. Prohlížení: **`/archive.html`** (lokálně i 
    (vytvoří `index.json` + `INDEX.md` — ty se **needitují ručně**).
 5. Commit + push na feature větev → PR → po merge je archiv živě na Vercelu.
 
-## Pozor
+## Jak uložit dokument (z iPadu — celý postup pro Martina)
+
+1. V Claude session **přilož soubor do chatu**.
+2. Napiš: *„ulož to do archivu"* + jednou větou k čemu to je.
+3. Claude ho uloží podle konvence výše, přegeneruje index, commitne a pushne
+   na feature větvi → PR → druhý brácha schválí → merge → je to živě.
+
+Session smí zaniknout kdykoli — jakmile je push venku, nic se neztratí.
+
+## Pravidla
 
 - Archiv je po deployi **veřejně dostupný** — nedávat sem nic citlivého
-  (doklady, hesla, osobní údaje).
-- Volné soubory přímo v `archive/` (mimo složky záznamů) index ignoruje.
+  (doklady, hesla, osobní údaje). Jen věci k projektu.
+- Soubory nad ~10 MB jen po domluvě — git si je pamatuje navždy a zpomalují
+  každý Vercel deploy.
+- Každý přírůstek projde generátorem — záznam bez přegenerovaného indexu je
+  k nenalezení. Volné soubory přímo v `archive/` (mimo složky záznamů)
+  index ignoruje.
+
+## Pro Claude (instrukce do budoucích sessions)
+
+Když se úkol týká archivu nebo dřívějších podkladů, **nejdřív si přečti
+`archive/INDEX.md`** (případně `index.json`) — je to jediná trvalá paměť
+napříč sessions. Při ukládání dodrž konvenci výše a vždy přegeneruj index
+(`node scripts/archive-index.js`).
